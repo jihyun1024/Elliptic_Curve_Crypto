@@ -51,31 +51,53 @@ int gf_mul(int a, int b) {
     return result & 0b1111;  // keep only 4 bits
 }
 
+// Define Point Doubling
+Point doubling(Point P1) {
+    Point R;
+
+    if (P1.x == 0) {
+        // P_1 * 2 = Point of infinity when P1.x = 0
+        R.x = 0;
+        R.y = 0;
+        return R;
+    }
+    else {
+        int plus = P1.x ^ P1.y;
+        int inverse = gf_inverse[P1.x];
+        int lambda = gf_mul(plus, inverse);
+
+        R.x = (gf_mul(lambda, lambda)) ^ lambda ^ A;
+        R.y = (gf_mul(P1.x, P1.x)) ^ gf_mul(lambda, R.x) ^ R.x;
+    }
+
+    return R;
+}
+
 // Define Point Addition
 Point addition(Point P1, Point P2) {
     Point R;
 
-    if (P1.x == P2.x && P1.y == P2.y) {
-        // 두 좌표가 같을 경우는 (0, 0)으로 정의
-        R.x = 0;
-        R.y = 0;
-    }
-    else {
-        int dx = P1.x ^ P2.x;
-        int dy = P1.y ^ P2.y;
+    int dx = P1.x ^ P2.x;
+    int dy = P1.y ^ P2.y;
 
-        if (dx == 0) {
+    if (P1.x == P2.x) {
+        if (P1.y == P2.y) {
+            // x, y좌표 모두 같을 때 -> doubling 호출
+            return doubling(P1);
+        }
+        else {
+            // x좌표만 같을 때 -> point of infinity
             R.x = 0;
             R.y = 0;
             return R;
         }
-        else {
-            int dx_inv = gf_inverse[dx];
-            int lambda = gf_mul(dy, dx_inv);
+    }
+    else {
+        int dx_inv = gf_inverse[dx];
+        int lambda = gf_mul(dy, dx_inv);
 
-            R.x = gf_mul(lambda, lambda) ^ lambda ^ P1.x ^ P2.x ^ A;
-            R.y = gf_mul(lambda, P1.x ^ R.x) ^ R.x ^ P1.y;
-        }
+        R.x = (gf_mul(lambda, lambda)) ^ lambda ^ P1.x ^ P2.x ^ A;
+        R.y = (gf_mul(lambda, P1.x ^ R.x)) ^ R.x ^ P1.y;
     }
 
     return R;
@@ -92,24 +114,25 @@ void print_bin(int num) {
 void print_table(Point points[], int size)
 {
 	printf("[Addition Table]\n");
+    Point result;
 
 	for (int cnt_i = 0; cnt_i < size; cnt_i++) {
 		for (int cnt_j = 0; cnt_j < size; cnt_j++) {
-			Point result = addition(points[cnt_i], points[cnt_j]);
+            result = addition(points[cnt_i], points[cnt_j]);
 
-			printf("(");
-			print_bin(points[cnt_i].x);
-			printf(", ");
-			print_bin(points[cnt_i].y);
-			printf(") + (");
-			print_bin(points[cnt_j].x);
-			printf(", ");
-			print_bin(points[cnt_j].y);
-			printf(") = (");
-			print_bin(result.x);
-			printf(", ");
-			print_bin(result.y);
-			printf(")\n");
+            printf("(");
+            print_bin(points[cnt_i].x);
+            printf(", ");
+            print_bin(points[cnt_i].y);
+            printf(") + (");
+            print_bin(points[cnt_j].x);
+            printf(", ");
+            print_bin(points[cnt_j].y);
+            printf(") = (");
+            print_bin(result.x);
+            printf(", ");
+            print_bin(result.y);
+            printf(")\n");
 		}
 	}
 }
