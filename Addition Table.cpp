@@ -1,12 +1,13 @@
 #include <stdio.h>
+#include <string.h>
 
 // Coefficient of Elliptic Curve
 #define A 0b1000
 
 // Point struct
 typedef struct _Point {
-	int x;
-	int y;
+    int x;
+    int y;
 }Point;
 
 // Inverse table of each elements in GF(2^4)
@@ -80,6 +81,14 @@ Point addition(Point P1, Point P2) {
     int dx = P1.x ^ P2.x;
     int dy = P1.y ^ P2.y;
 
+    if (P1.x == 0 && P1.y == 0) { // P1이 항등원.
+        return P2;
+    }
+
+    if (P2.x == 0 && P2.y == 0) { // P2가 항등원.
+        return P1;
+    }
+
     if (P1.x == P2.x) {
         if (P1.y == P2.y) {
             // x, y좌표 모두 같을 때 -> doubling 호출
@@ -103,30 +112,33 @@ Point addition(Point P1, Point P2) {
     return P3;
 }
 
-// Define Scalar Multiplication (Left-to-Right method)
+// Define Scalar Multiplication (Right-to-Left method)
 Point multiplication(Point P, int d) {
-    Point Result = P;
+    Point Q1 = P;
+    Point Q2;
+
+    Q2.x = 0b0000;
+    Q2.y = 0b0000;
 
     while (d > 0) {
-        Result = doubling(Result);
-        
         // If d_i == 1, operate addition
         if ((d & 1) == 1) {
-            Result = addition(Result, P);
+            Q2 = addition(Q2, Q1);
         }
-        
+        Q1 = doubling(Q1);
+
         // Right bit shift
         d = d >> 1;
     }
 
-    return Result;
+    return Q2;
 }
 
 // Print as binary
 void print_bin(int num) {
-	for (int cnt_i = 3; cnt_i >= 0; cnt_i--) {
-		printf("%d", (num >> cnt_i) & 1);
-	}
+    for (int cnt_i = 3; cnt_i >= 0; cnt_i--) {
+        printf("%d", (num >> cnt_i) & 1);
+    }
 }
 
 // Print as point coordinates
@@ -141,11 +153,11 @@ void print_point(Point point) {
 // Print table 
 void print_table(Point points[], int size)
 {
-	printf("[Addition Table]\n");
+    printf("[Addition Table]\n");
     Point result;
 
-	for (int cnt_i = 0; cnt_i < size; cnt_i++) {
-		for (int cnt_j = 0; cnt_j < size; cnt_j++) {
+    for (int cnt_i = 0; cnt_i < size; cnt_i++) {
+        for (int cnt_j = 0; cnt_j < size; cnt_j++) {
             result = addition(points[cnt_i], points[cnt_j]);
 
             print_point(points[cnt_i]);
@@ -154,37 +166,92 @@ void print_table(Point points[], int size)
             printf(" = ");
             print_point(result);
             printf("\n");
-		}
-	}
-}
-
-// Check E(F_2^4) is cyclic
-void check_cyclic(Point alpha) {
-    Point original = alpha;
-
-    printf("[0 multiplication] = point of infinity\n");
-    printf("[%d multiplication] = ", 1);
-    print_point(alpha);
-
-    printf("\n[%d multiplication] = ", 2);
-    alpha = doubling(alpha);
-    print_point(alpha);
-
-    // 0P, 1P, 2P는 이미 출력했으니 3P부터 출력
-    for (int cnt_i = 3; cnt_i < 21; cnt_i++) {
-        printf("\n[%d multiplication] = ", cnt_i);
-        alpha = addition(alpha, original);
-        print_point(alpha);
-
-        // Point of infinity인 경우
-        if (alpha.x == 0b0000 && alpha.y == 0b0000) {
-            printf(" ====> point of infinity\n\n");
         }
     }
 }
 
+// Check E(F_2^4) is cyclic
+void check_cyclic(Point points[], int size) {
+    for (int i = 0; i < size; i++) {
+
+        printf("[check if ");
+        print_point(points[i]);
+        printf(" is cyclic!!]\n");
+
+        Point alpha = points[i];
+        Point original = points[i];
+
+        printf("[0 multiplication] = point of infinity\n");
+        printf("[%d multiplication] = ", 1);
+        print_point(alpha);
+
+        // 0P, 1P는 이미 출력했으니 2P부터 출력
+        for (int cnt_i = 2; cnt_i <= 22; cnt_i++) {
+            printf("\n[%d multiplication] = ", cnt_i);
+            alpha = addition(alpha, original);
+            print_point(alpha);
+
+            // Point of infinity인 경우
+            if (alpha.x == 0b0000 && alpha.y == 0b0000) {
+                printf(" ====> point of infinity\n\n");
+
+                print_point(original);
+                printf("'s order is %d\n", cnt_i); // print order
+                if (cnt_i == 22) { // order is 22 -> generator!!
+                    printf("So, It is a generator!!\n");
+                }
+                printf("\n");
+                break;
+            }
+        }
+    }
+}
+
+// Point Labels
+// Label: 특정 항목이나 데이터를 식별하기 위해 사용하는 이름
+const char* get_label(Point p, Point points[], const char* labels[], int size) {
+    if (p.x == 0 && p.y == 0) return "∞"; // Point at infinity
+
+    for (int i = 0; i < size; i++) {
+        if (points[i].x == p.x && points[i].y == p.y) {
+            return labels[i];
+        }
+    }
+
+    // 해당 점에 대한 label을 찾지 못했음
+    return "?";
+}
+
+// Print Addition Table
+void print_add_table(Point points[], const char* labels[], int size) {
+    printf("    |");
+    for (int j = 0; j < size; j++) {
+        printf(" %4s", labels[j]);
+    }
+    printf("\n");
+    printf("----+");
+    for (int j = 0; j < size; j++) {
+        printf("-----");
+    }
+    printf("\n");
+
+    for (int i = 0; i < size; i++) {
+        printf("%3s |", labels[i]);
+        for (int j = 0; j < size; j++) {
+            Point result = addition(points[i], points[j]);
+            const char* res_label = get_label(result, points, labels, size);
+            printf(" %4s", res_label);
+        }
+        printf("\n");
+    }
+
+    printf("\n");
+}
+
+/*
+* 다른 파일에서 Addition Table.h를 사용하려면 주석 처리
 int main() {
-    Point points[] = 
+    Point points[] =
     {
         {0b0000, 0b1011}, {0b0001, 0b0000}, {0b0001, 0b0001},
         {0b0010, 0b1101}, {0b0010, 0b1111}, {0b0011, 0b1100},
@@ -195,11 +262,20 @@ int main() {
         {0b1100, 0b1100}, {0b1111, 0b0100}, {0b1111, 0b1011}
     };
 
-	int size = sizeof(points) / sizeof(points[0]);
-    print_table(points, size);
-    
-    Point P = { 0b1000, 0b0001 };
-    check_cyclic(P);
+    const char* labels[] = {
+        "P1",  "P2",  "P3",  "P4",  "P5",  "P6",  "P7",  "P8",  "P9",  "P10",
+        "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "P20", "P21"
+    };
 
-	return 0;
+    int size = sizeof(points) / sizeof(points[0]);
+
+    print_add_table(points, labels, size);
+
+    print_table(points, size);
+
+    check_cyclic(points, size);
+
+    return 0;
 }
+
+*/
